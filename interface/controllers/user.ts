@@ -303,7 +303,30 @@ export class UserController {
             return reader.execute(searchParam);
         }
     }
-
+        /**
+     * @swagger
+     * /total:
+     *   get:
+     *     summary: 🔎 Usuarios totales
+     *     description: <h4> Obtener total de usuarios en la aplicación.</h4><br/> Este endpoint permite obtener el total de usuarios registrados en la aplicación en el momento de ejecutar la petición."
+     *     tags: [App]
+     *     responses:
+     *       200:
+     *         description: Total usuarios
+     *         content: 
+     *           application/json:
+     *             schema:
+     *               total:
+     *                 type: integer
+     *                 description: Total de usuarios registrados en la aplicación
+     *       403:
+     *          $ref: '#/components/responses/BannedUserError'
+     */
+    async countAll(req: Request, res: Response, next: NextFunction): Promise<void> {
+        const ra = new ReadAll(userRepository);
+        const result = await ra.execute();
+        res.json({ count: result.length });
+    }
     /**
      * @swagger
      * /users/{id}:

@@ -1,7 +1,7 @@
 import express,{ Application, NextFunction, Request, Response } from "express";
 import swaggerUi from "swagger-ui-express";
 import { swaggerDocs } from "../config/swagger";
-import { NoAuthenticateRouter, UserRouter } from "./user";
+import { AppRouter, NoAuthenticateRouter, UserRouter } from "./user";
 import { PostRouter } from "./post";
 import { authenticateJWT, authorizeAdmin } from "../controllers/auth";
 import { LikePostRouter } from "./likepost";
@@ -21,6 +21,7 @@ export const setupRoutes = (app: Application) => {
  *   description: Rutas de autenticación
  */
   app.use(NoAuthenticateRouter)
+  app.use(AppRouter)
   // app.use((req, res, next) => {
   //   console.log("Before authenticateJWT middleware:", req.body);
   //   next();
