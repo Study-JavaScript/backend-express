@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { PrismaPostRepository } from "../../../infrastructure/repositories/prisma-post";
-import { FindDbError, UnauthorizedError } from "../../../domain/errors/main";
+import { FindDbError, InvalidUrlError, UnauthorizedError } from "../../../domain/errors/main";
 import { Post } from "../../../domain/entities/post";
 import { UserJWT } from "../../express";
 
@@ -268,4 +268,44 @@ export class PostController {
             throw new UnauthorizedError("user not authorized for softDelete");
         }
     };
+    /**
+ * @swagger
+ * /search:
+ *   get:
+ *     summary: Buscar posts por título o contenido
+ *     description: Este endpoint permite buscar posts por título o contenido. Introducir la parte del título o contenido que se desea buscar en el parámetro `q`.
+ *     tags: [Posts]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: q
+ *         in: query
+ *         description: La parte del título o contenido que se desea buscar.
+ *         schema:
+ *           type: string
+ *         required: true
+ *     responses:
+ *       200:
+ *         description: Lista de posts encontrados.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Post'
+ *       401: 
+ *         $ref: '#/components/responses/AuthError'
+ *       403:
+ *          $ref: '#/components/responses/BannedUserError'
+ */
+
+    //Hay que debouncer este endpoint
+    async search(req: Request, res: Response, next: NextFunction): Promise<void> {
+        const searchParam = req.query.q as string | undefined;
+        if (!searchParam) {
+            res.status(400).json({ message: "Parámetro de búsqueda no recibido" });
+            throw new InvalidUrlError("Without search param");
+        }
+        const posts = await postRepository.readAll()
+        const filteredPosts = posts.filter(post => post.title.toLowerCase().includes(searchParam.toLowerCase()) || post.content?.toLowerCase().includes(searchParam.toLowerCase()))
+        res.status(200).json(filteredPosts)
+    }
 }

@@ -21,6 +21,12 @@ export const setupRoutes = (app: Application) => {
  *   description: Rutas de autenticación
  */
   app.use(NoAuthenticateRouter)
+  /**
+ * @swagger
+ * tags:
+ *   name: App
+ *   description: Rutas de la aplicación
+ */
   app.use(AppRouter)
   // app.use((req, res, next) => {
   //   console.log("Before authenticateJWT middleware:", req.body);
