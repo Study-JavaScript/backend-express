@@ -3,6 +3,9 @@ import { PrismaPostRepository } from "../../../infrastructure/repositories/prism
 import { FindDbError, InvalidUrlError, UnauthorizedError } from "../../../domain/errors/main";
 import { Post } from "../../../domain/entities/post";
 import { UserJWT } from "../../express";
+import { CreatePost, ReadAllPosts, ReadById, UpdatePost } from "../../../application/usecases/atomic/post";
+import { PostsPopularity } from "../../../application/usecases/comp/post";
+import { userRepository } from "./user";
 
 const postRepository = new PrismaPostRepository()
 
@@ -59,17 +62,17 @@ export class PostController {
  *               content:
  *                 type: string
  *                 description: El contenido del post.
- *               authorId:
- *                 type: integer
- *                 description: El ID del autor que crea el post.
+ *               authorName:
+ *                 type: string
+ *                 description: El nombre del autor que crea el post.
  *             required:
  *               - title
  *               - content
- *               - authorId
+ *               - authorName
  *             example:
  *               title: "Titulo de Post de Prueba"
  *               content: "Este es el contenido del post de prueba del User2"
- *               authorId: 2
+ *               authorName: "User2"
  *              
  *     responses:
  *       201:
@@ -86,13 +89,14 @@ export class PostController {
  */
     async create(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const { title, content } = req.body;
+            const { title, content, authorName } = req.body;
             if (!req.user) {
                 res.status(401).json({ message: 'Sin autorización: Token no provisto' });
                 throw new UnauthorizedError("user not set in jwt")
             }
             const userId = req.user.id;
-            const post = await postRepository.create({ title, content }, userId);
+            const c = new CreatePost(postRepository)
+            const post = await c.execute({ title, content, authorName }, userId);
             res.status(201).json(post);
         } catch (error) {
             next(error);
@@ -100,12 +104,24 @@ export class PostController {
     }
     /**
  * @swagger
- * /posts:
+ * /posts/{order}:
  *   get:
  *     summary: Recuperar todos los posts
  *     tags: [Posts]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: order
+ *         schema:
+ *           type: string
+ *           enum: [nombre-asc, nombre-desc, popularidad-asc, popularidad-desc]
+ *         description: Tipo de búsqueda <br/> <ul><li>Si no se especifica -> Se ordenara por fecha mas reciente</li><li>`nombre-asc` -> Se ordenara por nombre de manera ascendente, por lo tanto los que tengan nombres empezados con z irán primero.</li><li>`nombre-desc` -> Se ordenara por nombre de manera descendente, por lo tanto los que tengan nombres empezados con a irán primero.</li><li>`popularidad-asc` -> Se ordenara por popularidad de manera ascendente, por lo tanto los que tengan menos likes irán primero.</li><li>`popularidad-desc` -> Se ordenara por popularidad de manera descendente, por lo tanto los que tengan mas likes irán primero.</li></ul>
+ *       - in: query
+ *         name: q
+ *         schema:
+ *           type: string
+ *         description: Parámetro de búsqueda en los títulos y contenido de los posts
  *     responses:
  *       200:
  *         description: Una lista de posts.
@@ -116,14 +132,54 @@ export class PostController {
  *               items:
  *                 $ref: '#/components/schemas/Post'
  */
-    async readAll(req: Request, res: Response, next: NextFunction): Promise<void>{
+// TODO: Añadir ordenación por fecha, ordenación por name asc y desc, ordenación por popularidad asc y desc, y search param por title y content.
+    async readAll(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const posts = await postRepository.readAll();
+            const { order } = req.params;
+            const searchQuery = req.query.q as string | undefined;
+            const ra = new ReadAllPosts(postRepository)
+            let posts = await ra.execute();
+
+            // Filtrar posts si hay una consulta de búsqueda
+            if (searchQuery) {
+                posts = posts.filter(post => 
+                    post.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                    post.content?.toLowerCase().includes(searchQuery.toLowerCase())
+                );
+            }
+
+            // Ordenar posts
+            switch (order) {
+                case 'nombre-asc':
+                    posts = posts.sort((a, b) => a.title.localeCompare(b.title));
+                    break;
+                case 'nombre-desc':
+                    posts = posts.sort((a, b) => b.title.localeCompare(a.title));
+                    break;
+                case 'popularidad-asc':
+                case 'popularidad-desc':
+                    const pp = new PostsPopularity(postRepository, userRepository)
+                    const postsPopularity = await pp.execute()
+                    posts = posts.sort((a, b) => {
+                        const popularityA = postsPopularity.find(p => p.id === a.id)?.popularity || 0;
+                        const popularityB = postsPopularity.find(p => p.id === b.id)?.popularity || 0;
+                        return order === 'popularidad-asc' 
+                            ? popularityA - popularityB 
+                            : popularityB - popularityA;
+                    });
+                    break;
+                default:
+                    // Ordenar por fecha más reciente
+                    posts = posts.sort((a, b) => b.date.getTime() - a.date.getTime());
+            }
+
             res.status(200).json(posts);
         } catch (error) {
             next(error);
         }
     } 
+
+// TODO: Añadir endpoint con la popularidad de cada post. y/o pp de todos los posts
     /**
  * @swagger
  * /posts/{id}:
@@ -178,8 +234,8 @@ export class PostController {
                 res.status(401).json({ message: 'Unauthorized' });
                 throw new UnauthorizedError(`user jwt ${!req.user ? "not set" : "invalid"}`)
             }
-
-            const post = await postRepository.update(parseInt(id), { title, content });
+            const u = new UpdatePost(postRepository)
+            const post = await u.execute(parseInt(id), { title, content });
             res.status(200).json(post);
         } catch (error) {
             next(error);
@@ -226,7 +282,8 @@ export class PostController {
     async delete(req: Request, res: Response, next: NextFunction): Promise<void>{
         try {
             const { id } = req.params;
-            const post = await postRepository.readById(parseInt(id))
+            const r = new ReadById(postRepository)
+            const post = await r.execute(parseInt(id))
             if(!post){
                 res.status(404).json({message: "Post not found"})
                 throw new FindDbError("Post")
@@ -298,14 +355,14 @@ export class PostController {
  */
 
     //Hay que debouncer este endpoint
-    async search(req: Request, res: Response, next: NextFunction): Promise<void> {
-        const searchParam = req.query.q as string | undefined;
-        if (!searchParam) {
-            res.status(400).json({ message: "Parámetro de búsqueda no recibido" });
-            throw new InvalidUrlError("Without search param");
-        }
-        const posts = await postRepository.readAll()
-        const filteredPosts = posts.filter(post => post.title.toLowerCase().includes(searchParam.toLowerCase()) || post.content?.toLowerCase().includes(searchParam.toLowerCase()))
-        res.status(200).json(filteredPosts)
-    }
+    // async search(req: Request, res: Response, next: NextFunction): Promise<void> {
+    //     const searchParam = req.query.q as string | undefined;
+    //     if (!searchParam) {
+    //         res.status(400).json({ message: "Parámetro de búsqueda no recibido" });
+    //         throw new InvalidUrlError("Without search param");
+    //     }
+    //     const posts = await postRepository.readAll()
+    //     const filteredPosts = posts.filter(post => post.title.toLowerCase().includes(searchParam.toLowerCase()) || post.content?.toLowerCase().includes(searchParam.toLowerCase()))
+    //     res.status(200).json(filteredPosts)
+    // }
 }

@@ -6,7 +6,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import dotenv from "dotenv"
 
-import { ReadAll, ReadByEmail, ReadById } from "../../../application/usecases/atomic/user"
+import { CreateUser, ReadAll, ReadByEmail, ReadById, UpdateUser } from "../../../application/usecases/atomic/user"
 import { FindDbError, InvalidUrlError, SetEnvError, UnauthorizedError } from "../../../domain/errors/main"
 import { PrismaUserRepository } from "../../../infrastructure/repositories/prisma-user";
 import { User } from "../../../domain/entities/user";
@@ -131,7 +131,8 @@ export class UserController {
     async login(req: Request, res: Response, next: NextFunction): Promise<void> {
         const { email, password } = req.body;
         try {
-            const user = await userRepository.readByEmail(email);
+            const r = new ReadByEmail(userRepository)
+            const user = await r.execute(email)
             if (user && (await bcrypt.compare(password, user.password))) {
                 const secret = process.env.JWT_SECRET;
                 if (!secret) throw new SetEnvError("JWT_SECRET");
@@ -214,7 +215,8 @@ export class UserController {
         const { name, email, password } = req.body;
         const hashedPassword = await bcrypt.hash(password, 10);
         try {
-            const user = await userRepository.create({ name, email, password: hashedPassword });
+            const c = new CreateUser(userRepository)
+            const user = await c.execute({ name, email, password: hashedPassword });
             res.status(201).json(user);
         } catch (error) {
             if (error instanceof Error) {
@@ -412,8 +414,8 @@ export class UserController {
                 res.status(403).json({ message: 'Prohibido. No autorizado a modificar este usuario' });
                 throw new UnauthorizedError("user not authorized");
             }
-
-            const user = await userRepository.update(parseInt(req.params.id), { name, email, password: hashedPassword });
+            const u = new UpdateUser(userRepository)
+            const user = await u.execute(parseInt(req.params.id), { name, email, password: hashedPassword });
             if (user) {
                 res.json(user);
             } else {
@@ -612,13 +614,14 @@ export class UserController {
                 res.status(403).json({ message: 'Forbidden' });
                 throw new UnauthorizedError("user not authorized");
             }
-            const user = await userRepository.readById(parseInt(req.params.id));
+            const r = new ReadById(userRepository)
+            const user = await r.execute(parseInt(req.params.id));
             if (!user) {
                 res.status(404).json({ message: 'User not exists' });
                 throw new FindDbError("user");
             }
-
-            const updatedUser = await userRepository.update(parseInt(req.params.id), { banned: !user.banned });
+            const u = new UpdateUser(userRepository)
+            const updatedUser = await u.execute(parseInt(req.params.id), { banned: !user.banned });
             if (updatedUser) {
                 res.json(updatedUser);
             } else {

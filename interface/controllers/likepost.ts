@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { PrismaLikePostRepository } from "../../../infrastructure/repositories/prisma-likepost";
 import { UnauthenticatedError } from "../../../domain/errors/main";
+import { CreateLikePost } from "../../../application/usecases/atomic/likepost";
 const likePostRepository = new PrismaLikePostRepository()
 
 /**
@@ -53,7 +54,8 @@ export class LikePostController {
         const {id} = req.params
         try {
             if(!req.user)throw new UnauthenticatedError("user jwt not set at likePost Controller")
-            const post = await likePostRepository.create(parseInt(id),req.user.id)
+            const c = new CreateLikePost(likePostRepository)
+            const post = await c.execute(parseInt(id),req.user.id)
             res.status(201).json(post)
         } catch (error) {
             next(error)
