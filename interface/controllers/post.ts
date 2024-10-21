@@ -327,42 +327,36 @@ export class PostController {
     };
     /**
  * @swagger
- * /search:
+ * /popularity:
  *   get:
- *     summary: Buscar posts por título o contenido
- *     description: Este endpoint permite buscar posts por título o contenido. Introducir la parte del título o contenido que se desea buscar en el parámetro `q`.
+ *     summary: Popularidad de los posts
+ *     description: Este endpoint permite ver la popularidad de los posts. Esta corresponde a la suma de likes dividido entre el total de usuarios - 1.
  *     tags: [Posts]
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - name: q
- *         in: query
- *         description: La parte del título o contenido que se desea buscar.
- *         schema:
- *           type: string
- *         required: true
  *     responses:
  *       200:
- *         description: Lista de posts encontrados.
+ *         description: Lista de posts y su popularidad.
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Post'
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: integer
+ *                   popularity:
+ *                     type: number
  *       401: 
  *         $ref: '#/components/responses/AuthError'
  *       403:
  *          $ref: '#/components/responses/BannedUserError'
  */
 
-    //Hay que debouncer este endpoint
-    // async search(req: Request, res: Response, next: NextFunction): Promise<void> {
-    //     const searchParam = req.query.q as string | undefined;
-    //     if (!searchParam) {
-    //         res.status(400).json({ message: "Parámetro de búsqueda no recibido" });
-    //         throw new InvalidUrlError("Without search param");
-    //     }
-    //     const posts = await postRepository.readAll()
-    //     const filteredPosts = posts.filter(post => post.title.toLowerCase().includes(searchParam.toLowerCase()) || post.content?.toLowerCase().includes(searchParam.toLowerCase()))
-    //     res.status(200).json(filteredPosts)
-    // }
+    async popularity(req: Request, res: Response, next: NextFunction): Promise<void> {
+        const pp = new PostsPopularity(postRepository, userRepository)
+        const popularity = await pp.execute()
+        res.status(200).json(popularity)
+    }
 }

@@ -10,6 +10,7 @@ PostRouter.post('/posts', controller.create);
 PostRouter.get('/posts/:order', debounce(controller.readAll, 2000));
 PostRouter.delete('/posts/:id', controller.delete);
 PostRouter.put('/posts/:id', controller.update);
+PostRouter.get('/popularity', controller.popularity);
 
 
 
