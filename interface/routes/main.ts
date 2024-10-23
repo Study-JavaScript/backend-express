@@ -1,5 +1,6 @@
 import express,{ Application, NextFunction, Request, Response } from "express";
 import swaggerUi from "swagger-ui-express";
+import cors from "cors";
 import { swaggerDocs } from "../config/swagger";
 import { AppRouter, NoAuthenticateRouter, UserRouter } from "./user";
 import { PostRouter } from "./post";
@@ -12,7 +13,11 @@ export const setupRoutes = (app: Application) => {
   // Servir Swagger UI
   // app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
-
+  app.use(cors({
+    origin: ['http://localhost:4321', 'http://localhost:3000'], 
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true
+  }));
   app.use(express.json());
   /**
  * @swagger
