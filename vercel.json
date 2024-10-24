@@ -6,7 +6,7 @@
       "use": "@vercel/node",
       "config": {
         "installCommand": "npm install && cd ../infrastructure && npm install && npx prisma generate --schema=./prisma/schema.prisma",
-        "buildCommand": "npm run build"
+        "buildCommand": "cd ../infrastructure && npx prisma generate --schema=./prisma/schema.prisma && cd ../backend-express && npm run build"
       }
     }
   ],
